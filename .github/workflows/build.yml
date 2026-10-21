@@ -1,4 +1,4 @@
-name: Build OpenWrt Packages (IPK & APK)
+name: Build OpenWrt Package (SDK)
 
 on:
   push:
@@ -16,9 +16,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Современный APK-таргет (актуальный транк / OpenWrt 24.10+)
           - format: apk
             arch: aarch64_cortex-a53
             ver: snapshot
+            
+          # Классический IPK-таргет (стабильный релиз 23.05)
           - format: ipk
             arch: mipsel_24kc
             ver: 23.05.5
@@ -26,26 +29,20 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          path: dns-watcher-source
 
-      - name: Build with OpenWrt SDK
+      - name: Build with Official OpenWrt SDK
         uses: openwrt/gh-action-sdk@main
         env:
           ARCH: ${{ matrix.arch }}
           VER: ${{ matrix.ver }}
-          # Передаем пакет через локальное копирование в дерево SDK
-          EXTRA_PACKAGES: ../dns-watcher-source
+          # По умолчанию gh-action-sdk берет текущий репозиторий как целевой пакет
           PACKAGES: dns-watcher
 
-      - name: Collect artifacts
+      - name: Collect compiled packages
         run: |
           mkdir -p output
-          if [ "${{ matrix.format }}" = "apk" ]; then
-            find bin/ -name "*.apk" -exec cp {} output/ \;
-          else
-            find bin/ -name "*.ipk" -exec cp {} output/ \;
-          fi
+          # SDK складывает результаты в bin/packages/<arch>/base/ (или аналогичные подпапки)
+          find bin/ -name "dns-watcher_*.*" -exec cp {} output/ \;
           ls -la output/
 
       - name: Upload Artifacts
