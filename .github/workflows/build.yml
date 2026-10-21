@@ -10,38 +10,46 @@ on:
 
 jobs:
   build:
-    name: Build for SDK ${{ matrix.sdk }}
+    name: Build (${{ matrix.format }} / ${{ matrix.arch }})
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Сборка под IPK (например, релиз OpenWrt 23.05)
-          - sdk: x86_64-23.05
-            format: ipk
-          # Сборка под APK (например, транк / версия 24.10+)
-          - sdk: x86_64
-            format: apk
+          # Современный формат APK под aarch64 (например, MediaTek Filogic / RAX3000M)
+          - format: apk
+            arch: aarch64_cortex-a53
+            ver: snapshot
+            
+          # Классический формат IPK под mipsel (например, старые роутеры / Keenetic)
+          - format: ipk
+            arch: mipsel_24kc
+            ver: 23.05.5
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Compile OpenWrt Package using Official SDK Action
+      - name: Build with OpenWrt SDK
         uses: openwrt/gh-action-sdk@main
         env:
-          ARCH: ${{ matrix.sdk }}
+          ARCH: ${{ matrix.arch }}
+          VER: ${{ matrix.ver }}
           PACKAGES: dns-watcher
 
-      - name: Collect and organize artifacts
+      - name: Collect artifacts
         run: |
           mkdir -p output
-          # Экшен складывает скомпилированные пакеты внутрь bin/packages/
-          find bin/ -name "*.ipk" -o -name "*.apk" -exec cp {} output/ \;
+          # Ищем собранные пакеты в зависимости от формата
+          if [ "${{ matrix.format }}" = "apk" ]; then
+            find bin/ -name "*.apk" -exec cp {} output/ \;
+          else
+            find bin/ -name "*.ipk" -exec cp {} output/ \;
+          fi
           ls -la output/
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: openwrt-package-${{ matrix.sdk }}-${{ matrix.format }}
+          name: dns-watcher-${{ matrix.format }}-${{ matrix.arch }}
           path: output/*
