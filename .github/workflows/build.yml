@@ -9,76 +9,26 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build (${{ matrix.format }})
+  build_ipk:
+    name: Build IPK Package
     runs-on: ubuntu-22.04
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - format: ipk
-            ext: ipk
-          - format: apk
-            ext: apk
-
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5  # <--- Обновлено с v4 на v5 для совместимости с новым окружением
+        uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Build IPK using official OpenWrt SDK container
         run: |
-          sudo apt-get update
-          sudo apt-get install -y opkg-utils tar gzip
-
-      - name: Build IPK Package
-        if: matrix.format == 'ipk'
-        run: |
-          mkdir -p build_ipk/CONTROL build_ipk/root
-          
-          cat << 'EOF' > build_ipk/CONTROL/control
-          Package: dns-watcher
-          Title: Modular DNS tunnel watcher
-          Version: 1.0-${{ github.run_number }}
-          Section: net
-          Architecture: all
-          Maintainer: Dmitry Morozov
-          Depends: libc, ubus, jsonfilter
-          Description: Event-driven DNS monitoring service for OpenWrt tunnels using procd and external hooks.
-          EOF
-
-          cp -r files/* build_ipk/root/
-          chmod +x build_ipk/root/etc/init.d/dns-watcher
-          chmod +x build_ipk/root/usr/bin/dns-watcher
-
-          opkg-build -o root -g root build_ipk/ ./output/
-
-      - name: Build APK Package
-        if: matrix.format == 'apk'
-        run: |
-          mkdir -p build_apk
-          
-          cat << 'EOF' > build_apk/.PKGINFO
-          pkgname = dns-watcher
-          pkgver = 1.0-${{ github.run_number }}
-          pkgdesc = Modular DNS tunnel watcher for OpenWrt
-          url = https://github.com/
-          arch = noarch
-          maintainer = Dmitry Morozov
-          license = MIT
-          depend = ubus
-          depend = jsonfilter
-          EOF
-
-          cp -r files/* build_apk/
-          chmod +x build_apk/etc/init.d/dns-watcher
-          chmod +x build_apk/usr/bin/dns-watcher
-
           mkdir -p output
-          cd build_apk
-          tar --numeric-owner --owner=0 --group=0 -czf ../output/dns-watcher-1.0-${{ github.run_number }}_all.apk .PKGINFO etc/ usr/
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dns-watcher-${{ matrix.format }}-package
-          path: output/*.*
+          
+          # Скачиваем легкий официальный SDK или используем докер-контейнер OpenWrt
+          # Простейший способ через Docker-контейнер со всеми тулзами:
+          docker run --rm -v ${{ github.workspace }}:/workdir -w /workdir alpine:latest sh -c "
+            apk update && apk add bash make tar gzip wget python3 py3-pip
+          "
+          
+          # Либо используем официальный экшен SDK, который не ломается, если зафиксировать окружение:
+      - name: Build with OpenWrt SDK Action
+        uses: openwrt/gh-action-sdk@v5
+        env:
+          ARCH: x86_64-23.05
+          PACKAGES: dns-watcher
