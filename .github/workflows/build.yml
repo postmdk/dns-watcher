@@ -36,22 +36,26 @@ jobs:
 
       - name: Prepare packages for upload
         run: |
-          mkdir -p compiled-packages
-          # Рекурсивно ищем и копируем строго наш пакет dns-watcher (.ipk и .apk), исключая системные зависимости
-          find bin/packages/ -type f \( -name "dns-watcher_*.ipk" -o -name "dns-watcher_*.apk" \) -exec cp {} compiled-packages/ \;
-          ls -la compiled-packages/
+          # Создаем уникальную подпапку для текущей архитектуры, чтобы задачи матрицы не конфликтовали
+          mkdir -p compiled-packages/${{ matrix.arch }}
+          
+          # Рекурсивно ищем и копируем строго наш пакет dns-watcher (.ipk и .apk), исключая любые другие файлы
+          find bin/packages/ -type f \( -name "dns-watcher_*.ipk" -o -name "dns-watcher_*.apk" \) -exec cp {} compiled-packages/${{ matrix.arch }}/ \;
+          
+          # Выводим список для проверки
+          ls -la compiled-packages/${{ matrix.arch }}/
 
       - name: Upload artifacts (for workflow run)
         uses: actions/upload-artifact@v4
         with:
           name: openwrt-packages-${{ matrix.arch }}-${{ matrix.ver }}
-          path: compiled-packages/*
+          path: compiled-packages/${{ matrix.arch }}/*
 
       - name: Publish Release (on Tag)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: compiled-packages/*
+          files: compiled-packages/**/*
           files_glob: true
           draft: false
           prerelease: false
