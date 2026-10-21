@@ -33,7 +33,7 @@ jobs:
         run: |
           mkdir -p build_ipk/CONTROL output
           
-          # Стандартный формат control без лишних полей
+          # Создаем файл control (обязательно с переводом строки в конце)
           cat << 'EOF' > build_ipk/CONTROL/control
           Package: dns-watcher
           Version: 1.0-${{ github.run_number }}
@@ -42,9 +42,13 @@ jobs:
           Maintainer: Dmitry Morozov
           Depends: libc, ubus, jsonfilter
           Description: Event-driven DNS monitoring service for OpenWrt tunnels using procd and external hooks.
+          
           EOF
 
-          # Копируем файлы НАПРЯМУЮ в корень build_ipk/ (рядом с CONTROL)
+          # Гарантированно убираем Windows-переводы строк (CRLF -> LF)
+          sed -i 's/\r$//' build_ipk/CONTROL/control
+
+          # Копируем файлы в корень build_ipk/
           if [ -d "files" ]; then
             cp -r files/* build_ipk/
           elif [ -d "etc" ] || [ -d "usr" ]; then
@@ -55,17 +59,21 @@ jobs:
             exit 1
           fi
 
-          # Выставляем права и убираем возможные CRLF (Windows line endings)
+          # Выставляем права и убираем CRLF у скриптов
           for f in build_ipk/etc/init.d/dns-watcher build_ipk/usr/bin/dns-watcher build_ipk/etc/dns-watcher/*.sh; do
             if [ -f "$f" ]; then
               chmod +x "$f"
-              sed -i -e 's/\r$//' "$f"
+              sed -i 's/\r$//' "$f"
             fi
           done
 
-          # Скачиваем opkg-build и собираем пакет
+          # Скачиваем официальный opkg-build и запускаем в режиме отладки
           curl -sSL https://git.openwrt.org/project/opkg-utils.git/blob_plain/HEAD:/opkg-build -o opkg-build
           chmod +x opkg-build
+          
+          echo "=== Control file content ==="
+          cat build_ipk/CONTROL/control
+          
           ./opkg-build -o root -g root build_ipk/ ./output/
 
       - name: Build APK Package
@@ -85,6 +93,8 @@ jobs:
           depend = jsonfilter
           EOF
 
+          sed -i 's/\r$//' build_apk/.PKGINFO
+
           if [ -d "files" ]; then
             cp -r files/* build_apk/
           elif [ -d "etc" ] || [ -d "usr" ]; then
@@ -95,7 +105,7 @@ jobs:
           for f in build_apk/etc/init.d/dns-watcher build_apk/usr/bin/dns-watcher build_apk/etc/dns-watcher/*.sh; do
             if [ -f "$f" ]; then
               chmod +x "$f"
-              sed -i -e 's/\r$//' "$f"
+              sed -i 's/\r$//' "$f"
             fi
           done
 
