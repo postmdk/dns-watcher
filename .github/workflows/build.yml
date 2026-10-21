@@ -11,52 +11,80 @@ on:
 jobs:
   build:
     name: Build (${{ matrix.format }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # Фиксируем стабильную версию Ubuntu, избегая проблем с Node.js/Ubuntu 26
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Сборка .ipk для стабильных веток (например, OpenWrt 23.05 / 24.10 с opkg)
           - format: ipk
-            arch: x86_64
-            sdk: x86_64-23.05
-          
-          # Сборка .apk для современных веток (OpenWrt 24.10+ / 25.xx с переходом на apk)
+            ext: ipk
           - format: apk
-            arch: x86_64
-            sdk: x86_64-24.10
+            ext: apk
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Prepare package directory structure for SDK
+      - name: Install build dependencies
         run: |
-          # OpenWrt SDK ожидает структуру фида/пакета. 
-          # Помещаем наш пакет во временную директорию кастомного фида.
-          mkdir -p custom_feed/net/dns-watcher
-          cp -r Makefile files/ custom_feed/net/dns-watcher/
+          sudo apt-get update
+          sudo apt-get install -y opkg-utils tar gzip
+
+      - name: Build IPK Package
+        if: matrix.format == 'ipk'
+        run: |
+          mkdir -p build_ipk/CONTROL build_ipk/root
           
-          # Если форматируем под apk, можно убедиться, что метаданные корректны
-          echo "Current format target: ${{ matrix.format }}"
+          # Метаданные для IPK
+          cat << 'EOF' > build_ipk/CONTROL/control
+          Package: dns-watcher
+          Title: Modular DNS tunnel watcher
+          Version: 1.0-${{ github.run_number }}
+          Section: net
+          Architecture: all
+          Maintainer: Dmitry Morozov
+          Depends: libc, ubus, jsonfilter
+          Description: Event-driven DNS monitoring service for OpenWrt tunnels using procd and external hooks.
+          EOF
 
-      - name: Build package using OpenWrt SDK
-        uses: openwrt/gh-action-sdk@v2
-        env:
-          ARCH: ${{ matrix.sdk }}
-          PACKAGES: dns-watcher
-          EXTRA_FEEDS: |
-            custom_feed $GITHUB_WORKSPACE/custom_feed
+          # Копируем файлы
+          cp -r files/* build_ipk/root/
+          chmod +x build_ipk/root/etc/init.d/dns-watcher
+          chmod +x build_ipk/root/usr/bin/dns-watcher
 
-      - name: Extract and Organize Artifacts
+          # Собираем ipk
+          opkg-build -o root -g root build_ipk/ ./output/
+
+      - name: Build APK Package
+        if: matrix.format == 'apk'
         run: |
-          mkdir -p compiled_packages
-          # Ищем собранные пакеты (.ipk или .apk) внутри рабочей директории SDK
-          find . -name "dns-watcher_*.*" -exec cp {} compiled_packages/ \;
-          ls -la compiled_packages/
+          mkdir -p build_apk
+          
+          # Метаданные для APK (.PKGINFO)
+          cat << 'EOF' > build_apk/.PKGINFO
+          pkgname = dns-watcher
+          pkgver = 1.0-${{ github.run_number }}
+          pkgdesc = Modular DNS tunnel watcher for OpenWrt
+          url = https://github.com/
+          arch = noarch
+          maintainer = Dmitry Morozov
+          license = MIT
+          depend = ubus
+          depend = jsonfilter
+          EOF
+
+          # Копируем структуру файлов рядом с .PKGINFO
+          cp -r files/* build_apk/
+          chmod +x build_apk/etc/init.d/dns-watcher
+          chmod +x build_apk/usr/bin/dns-watcher
+
+          # Собираем apk в корень output/
+          mkdir -p output
+          cd build_apk
+          tar --numeric-owner --owner=0 --group=0 -czf ../output/dns-watcher-1.0-${{ github.run_number }}_all.apk .PKGINFO etc/ usr/
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dns-watcher-${{ matrix.format }}-package
-          path: compiled_packages/*
+          path: output/*.*
