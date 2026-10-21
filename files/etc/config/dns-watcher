@@ -1,0 +1,8 @@
+config dns-watcher 'settings'
+    option enabled '1'
+    option interface 'awg0'
+    option target_dns '10.2.1.1'
+    option interval '10'
+    option startup_delay '30'
+    option on_reachable '/etc/dns-watcher/up.sh'
+    option on_unreachable '/etc/dns-watcher/down.sh'

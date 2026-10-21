@@ -1,0 +1,74 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+# 1. Читаем конфиг демона один раз при старте
+config_load 'dns-watcher'
+config_get ENABLED 'settings' 'enabled' '1'
+config_get INTERFACE 'settings' 'interface' ''
+config_get TARGET_DNS 'settings' 'target_dns' '10.2.1.1'
+config_get INTERVAL 'settings' 'interval' '3'
+config_get STARTUP_DELAY 'settings' 'startup_delay' '10'
+config_get HOOK_UP 'settings' 'on_reachable' '/etc/dns-watcher/up.sh'
+config_get HOOK_DOWN 'settings' 'on_unreachable' '/etc/dns-watcher/down.sh'
+
+[ "$ENABLED" != "1" ] && exit 0
+if [ "$STARTUP_DELAY" -gt 0 ]; then
+    #logger -t dns-watcher "Startup delay: waiting ${STARTUP_DELAY}s for network/tunnels..."
+    sleep "$STARTUP_DELAY"
+fi
+
+# DNS retrieval function
+get_interface_dns() {
+    local ifname="$1"
+    local dns=""
+    
+    if [ -n "$ifname" ]; then
+        # Read static settings from UCI
+        dns=$(uci -q get network."$ifname".dns)
+        
+        # If UCI is empty, try requesting a dynamic address from netifd via ubus.
+        if [ -z "$dns" ]; then
+            dns=$(ubus call "network.interface.$ifname" status 2>/dev/null | jsonfilter -e '@["dns-server"][0]' 2>/dev/null)
+        fi
+    fi
+    
+    echo "$dns"
+}
+
+state=-1
+logger -t dns-watcher "Starting DNS tunnel watcher daemon..."
+
+# 2. Determine the target DNS once at startup
+ACTIVE_DNS=""
+[ -n "$INTERFACE" ] && ACTIVE_DNS=$(get_interface_dns "$INTERFACE")
+
+# If nothing works via the interface, we use the fallback address from the config.
+[ -z "$ACTIVE_DNS" ] && ACTIVE_DNS="$TARGET_DNS"
+
+# 3. A basic, lightweight loop that avoids unnecessary calls to UCI/ubus
+while true; do
+    if [ -n "$ACTIVE_DNS" ]; then
+        if nslookup -port=53 -timeout=1 root-servers.net "$ACTIVE_DNS" >/dev/null 2>&1; then
+            current_state=1
+        else
+            current_state=0
+        fi
+
+        # We respond only to a change of state
+        if [ "$current_state" -ne "$state" ]; then
+            state=$current_state
+            if [ "$state" -eq 1 ]; then
+                logger -t dns-watcher "Tunnel DNS ($ACTIVE_DNS) is reachable."
+                [ -x "$HOOK_UP" ] && "$HOOK_UP"
+            else
+                logger -t dns-watcher "Tunnel DNS ($ACTIVE_DNS) is unreachable."
+                [ -x "$HOOK_DOWN" ] && "$HOOK_DOWN"
+            fi
+        fi
+    else
+        logger -t dns-watcher "Warning: Target DNS IP is empty."
+    fi
+
+    sleep "$INTERVAL"
+done
