@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Современный APK-таргет (актуальный транк / OpenWrt 24.10+)
+          # Современный APK-таргет (snapshot / актуальные ветки)
           - format: apk
             arch: aarch64_cortex-a53
             ver: snapshot
@@ -35,13 +35,12 @@ jobs:
         env:
           ARCH: ${{ matrix.arch }}
           VER: ${{ matrix.ver }}
-          # По умолчанию gh-action-sdk берет текущий репозиторий как целевой пакет
           PACKAGES: dns-watcher
 
       - name: Collect compiled packages
         run: |
           mkdir -p output
-          # SDK складывает результаты в bin/packages/<arch>/base/ (или аналогичные подпапки)
+          # Ищем и копируем собранные пакеты независимо от подпапок SDK
           find bin/ -name "dns-watcher_*.*" -exec cp {} output/ \;
           ls -la output/
 
