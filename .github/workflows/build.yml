@@ -23,15 +23,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Debug repository structure
-        run: |
-          echo "=== Root contents ==="
-          ls -la
-          if [ -d "files" ]; then
-            echo "=== Files directory contents ==="
-            ls -la files/
-          fi
-
       - name: Install build dependencies
         run: |
           sudo apt-get update
@@ -40,11 +31,11 @@ jobs:
       - name: Build IPK Package
         if: matrix.format == 'ipk'
         run: |
-          mkdir -p build_ipk/CONTROL build_ipk/root output
+          mkdir -p build_ipk/CONTROL output
           
+          # Стандартный формат control без лишних полей
           cat << 'EOF' > build_ipk/CONTROL/control
           Package: dns-watcher
-          Title: Modular DNS tunnel watcher
           Version: 1.0-${{ github.run_number }}
           Section: net
           Architecture: all
@@ -53,23 +44,26 @@ jobs:
           Description: Event-driven DNS monitoring service for OpenWrt tunnels using procd and external hooks.
           EOF
 
-          # Универсальное копирование: поддерживаем и папку files/, и файлы в корне
+          # Копируем файлы НАПРЯМУЮ в корень build_ipk/ (рядом с CONTROL)
           if [ -d "files" ]; then
-            cp -r files/* build_ipk/root/
+            cp -r files/* build_ipk/
           elif [ -d "etc" ] || [ -d "usr" ]; then
-            [ -d "etc" ] && cp -r etc build_ipk/root/
-            [ -d "usr" ] && cp -r usr build_ipk/root/
+            [ -d "etc" ] && cp -r etc build_ipk/
+            [ -d "usr" ] && cp -r usr build_ipk/
           else
-            echo "Error: Source files (etc/usr or files/) not found in repository!"
+            echo "Error: Source files not found!"
             exit 1
           fi
 
-          # Безопасное выставление прав (только если файлы реально существуют)
-          [ -f "build_ipk/root/etc/init.d/dns-watcher" ] && chmod +x build_ipk/root/etc/init.d/dns-watcher
-          [ -f "build_ipk/root/usr/bin/dns-watcher" ] && chmod +x build_ipk/root/usr/bin/dns-watcher
-          [ -f "build_ipk/root/etc/dns-watcher/up.sh" ] && chmod +x build_ipk/root/etc/dns-watcher/up.sh
-          [ -f "build_ipk/root/etc/dns-watcher/down.sh" ] && chmod +x build_ipk/root/etc/dns-watcher/down.sh
+          # Выставляем права и убираем возможные CRLF (Windows line endings)
+          for f in build_ipk/etc/init.d/dns-watcher build_ipk/usr/bin/dns-watcher build_ipk/etc/dns-watcher/*.sh; do
+            if [ -f "$f" ]; then
+              chmod +x "$f"
+              sed -i -e 's/\r$//' "$f"
+            fi
+          done
 
+          # Скачиваем opkg-build и собираем пакет
           curl -sSL https://git.openwrt.org/project/opkg-utils.git/blob_plain/HEAD:/opkg-build -o opkg-build
           chmod +x opkg-build
           ./opkg-build -o root -g root build_ipk/ ./output/
@@ -96,15 +90,14 @@ jobs:
           elif [ -d "etc" ] || [ -d "usr" ]; then
             [ -d "etc" ] && cp -r etc build_apk/
             [ -d "usr" ] && cp -r usr build_apk/
-          else
-            echo "Error: Source files (etc/usr or files/) not found in repository!"
-            exit 1
           fi
 
-          [ -f "build_apk/etc/init.d/dns-watcher" ] && chmod +x build_apk/etc/init.d/dns-watcher
-          [ -f "build_apk/usr/bin/dns-watcher" ] && chmod +x build_apk/usr/bin/dns-watcher
-          [ -f "build_apk/etc/dns-watcher/up.sh" ] && chmod +x build_apk/etc/dns-watcher/up.sh
-          [ -f "build_apk/etc/dns-watcher/down.sh" ] && chmod +x build_apk/etc/dns-watcher/down.sh
+          for f in build_apk/etc/init.d/dns-watcher build_apk/usr/bin/dns-watcher build_apk/etc/dns-watcher/*.sh; do
+            if [ -f "$f" ]; then
+              chmod +x "$f"
+              sed -i -e 's/\r$//' "$f"
+            fi
+          done
 
           cd build_apk
           tar --numeric-owner --owner=0 --group=0 -czf ../output/dns-watcher-1.0-${{ github.run_number }}_all.apk .PKGINFO etc/ usr/
