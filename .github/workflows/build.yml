@@ -1,0 +1,62 @@
+name: Build OpenWrt Packages (IPK & APK)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (${{ matrix.format }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Сборка .ipk для стабильных веток (например, OpenWrt 23.05 / 24.10 с opkg)
+          - format: ipk
+            arch: x86_64
+            sdk: x86_64-23.05
+          
+          # Сборка .apk для современных веток (OpenWrt 24.10+ / 25.xx с переходом на apk)
+          - format: apk
+            arch: x86_64
+            sdk: x86_64-24.10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare package directory structure for SDK
+        run: |
+          # OpenWrt SDK ожидает структуру фида/пакета. 
+          # Помещаем наш пакет во временную директорию кастомного фида.
+          mkdir -p custom_feed/net/dns-watcher
+          cp -r Makefile files/ custom_feed/net/dns-watcher/
+          
+          # Если форматируем под apk, можно убедиться, что метаданные корректны
+          echo "Current format target: ${{ matrix.format }}"
+
+      - name: Build package using OpenWrt SDK
+        uses: openwrt/gh-action-sdk@v2
+        env:
+          ARCH: ${{ matrix.sdk }}
+          PACKAGES: dns-watcher
+          EXTRA_FEEDS: |
+            custom_feed $GITHUB_WORKSPACE/custom_feed
+
+      - name: Extract and Organize Artifacts
+        run: |
+          mkdir -p compiled_packages
+          # Ищем собранные пакеты (.ipk или .apk) внутри рабочей директории SDK
+          find . -name "dns-watcher_*.*" -exec cp {} compiled_packages/ \;
+          ls -la compiled_packages/
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dns-watcher-${{ matrix.format }}-package
+          path: compiled_packages/*
