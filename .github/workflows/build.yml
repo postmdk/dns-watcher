@@ -3,7 +3,7 @@ name: Build OpenWrt Package (SDK)
 on:
   push:
     branches: [ "main", "master" ]
-    tags: [ "v*" ]
+    tags: [ "v*" ] # Автоматически сработает при создании тега, например git tag v1.0.0 && git push --tags
   pull_request:
     branches: [ "main", "master" ]
   workflow_dispatch:
@@ -34,12 +34,25 @@ jobs:
           VER: ${{ matrix.ver }}
           PACKAGES: dns-watcher
 
-      # Добавьте этот шаг, чтобы забрать скомпилированные пакеты
-      - name: Upload built packages
+      - name: Prepare packages for upload
+        run: |
+          mkdir -p compiled-packages
+          # Находим все собранные .ipk и .apk пакеты и копируем их в плоскую папку с понятными именами
+          find bin/packages/ -name "*.ipk" -o -name "*.apk" | while read -r file; do
+            cp "$file" compiled-packages/
+          done
+          ls -la compiled-packages/
+
+      - name: Upload artifacts (for workflow run)
         uses: actions/upload-artifact@v4
         with:
           name: openwrt-packages-${{ matrix.arch }}-${{ matrix.ver }}
-          path: |
-            bin/packages/**/*.ipk
-            bin/packages/**/*.apk
-          if-no-files-found: error
+          path: compiled-packages/*
+
+      - name: Publish Release (on Tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: compiled-packages/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
