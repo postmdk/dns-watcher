@@ -9,26 +9,79 @@ on:
   workflow_dispatch:
 
 jobs:
-  build_ipk:
-    name: Build IPK Package
+  build:
+    name: Build (${{ matrix.format }})
     runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - format: ipk
+          - format: apk
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5  # Актуальная версия без проблем с Node.js
 
-      - name: Build IPK using official OpenWrt SDK container
+      - name: Install build dependencies
         run: |
-          mkdir -p output
+          sudo apt-get update
+          sudo apt-get install -y curl tar gzip
+
+      - name: Build IPK Package
+        if: matrix.format == 'ipk'
+        run: |
+          mkdir -p build_ipk/CONTROL build_ipk/root output
           
-          # Скачиваем легкий официальный SDK или используем докер-контейнер OpenWrt
-          # Простейший способ через Docker-контейнер со всеми тулзами:
-          docker run --rm -v ${{ github.workspace }}:/workdir -w /workdir alpine:latest sh -c "
-            apk update && apk add bash make tar gzip wget python3 py3-pip
-          "
+          cat << 'EOF' > build_ipk/CONTROL/control
+          Package: dns-watcher
+          Title: Modular DNS tunnel watcher
+          Version: 1.0-${{ github.run_number }}
+          Section: net
+          Architecture: all
+          Maintainer: Dmitry Morozov
+          Depends: libc, ubus, jsonfilter
+          Description: Event-driven DNS monitoring service for OpenWrt tunnels using procd and external hooks.
+          EOF
+
+          cp -r files/* build_ipk/root/
+          chmod +x build_ipk/root/etc/init.d/dns-watcher
+          chmod +x build_ipk/root/usr/bin/dns-watcher
+
+          # Скачиваем официальный скрипт opkg-build напрямую из репозитория OpenWrt
+          curl -sSL https://git.openwrt.org/project/opkg-utils.git/blob_plain/HEAD:/opkg-build -o opkg-build
+          chmod +x opkg-build
+
+          # Собираем корректный .ipk пакет
+          ./opkg-build -o root -g root build_ipk/ ./output/
+
+      - name: Build APK Package
+        if: matrix.format == 'apk'
+        run: |
+          mkdir -p build_apk output
           
-          # Либо используем официальный экшен SDK, который не ломается, если зафиксировать окружение:
-      - name: Build with OpenWrt SDK Action
-        uses: openwrt/gh-action-sdk@v5
-        env:
-          ARCH: x86_64-23.05
-          PACKAGES: dns-watcher
+          cat << 'EOF' > build_apk/.PKGINFO
+          pkgname = dns-watcher
+          pkgver = 1.0-${{ github.run_number }}
+          pkgdesc = Modular DNS tunnel watcher for OpenWrt
+          url = https://github.com/
+          arch = noarch
+          maintainer = Dmitry Morozov
+          license = MIT
+          depend = ubus
+          depend = jsonfilter
+          EOF
+
+          cp -r files/* build_apk/
+          chmod +x build_apk/etc/init.d/dns-watcher
+          chmod +x build_apk/usr/bin/dns-watcher
+
+          cd build_apk
+          tar --numeric-owner --owner=0 --group=0 -czf ../output/dns-watcher-1.0-${{ github.run_number }}_all.apk .PKGINFO etc/ usr/
+          cd ..
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dns-watcher-${{ matrix.format }}-package
+          path: output/*.*
