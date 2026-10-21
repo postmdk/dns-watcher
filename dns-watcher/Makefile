@@ -31,10 +31,13 @@ define Build/Compile
 endef
 
 define Package/dns-watcher/install
+	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_DIR) $(1)/etc/dns-watcher
 	$(INSTALL_DIR) $(1)/usr/bin
 
+	$(if $(wildcard $(PKG_BUILD_DIR)/files/etc/config/dns-watcher), \
+		$(INSTALL_CONF) $(PKG_BUILD_DIR)/files/etc/config/dns-watcher $(1)/etc/config/dns-watcher)
 	$(if $(wildcard $(PKG_BUILD_DIR)/files/etc/init.d/dns-watcher), \
 		$(INSTALL_BIN) $(PKG_BUILD_DIR)/files/etc/init.d/dns-watcher $(1)/etc/init.d/dns-watcher)
 	$(if $(wildcard $(PKG_BUILD_DIR)/usr/bin/dns-watcher), \
