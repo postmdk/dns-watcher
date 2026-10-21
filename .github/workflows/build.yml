@@ -3,7 +3,7 @@ name: Build OpenWrt Package (SDK)
 on:
   push:
     branches: [ "main", "master" ]
-    tags: [ "v*" ] # Автоматически сработает при создании тега, например git tag v1.0.0 && git push --tags
+    tags: [ "v*" ]
   pull_request:
     branches: [ "main", "master" ]
   workflow_dispatch:
@@ -18,10 +18,10 @@ jobs:
         include:
           - format: apk
             arch: aarch64_cortex-a53
-            ver: 25.12.6
+            ver: snapshot
           - format: ipk
             arch: mipsel_24kc
-            ver: 23.05.6
+            ver: 23.05.5
 
     steps:
       - name: Checkout repository
@@ -37,10 +37,8 @@ jobs:
       - name: Prepare packages for upload
         run: |
           mkdir -p compiled-packages
-          # Копируем строго наш пакет dns-watcher, игнорируя зависимости
-          find bin/packages/ -name "dns-watcher_*.ipk" -o -name "dns-watcher_*.apk" | while read -r file; do
-            cp "$file" compiled-packages/
-          done
+          # Рекурсивно ищем и копируем строго наш пакет dns-watcher (.ipk и .apk), исключая системные зависимости
+          find bin/packages/ -type f \( -name "dns-watcher_*.ipk" -o -name "dns-watcher_*.apk" \) -exec cp {} compiled-packages/ \;
           ls -la compiled-packages/
 
       - name: Upload artifacts (for workflow run)
@@ -54,20 +52,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: compiled-packages/*
-          # Добавим параметр, чтобы перезаписывать файлы при совпадении имен, если запущено несколько задач в матрице
-          fail_on_unmatched_files: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload artifacts (for workflow run)
-        uses: actions/upload-artifact@v4
-        with:
-          name: openwrt-packages-${{ matrix.arch }}-${{ matrix.ver }}
-          path: compiled-packages/*
-
-      - name: Publish Release (on Tag)
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: compiled-packages/*
+          files_glob: true
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
