@@ -11,7 +11,7 @@ on:
 jobs:
   build:
     name: Build (${{ matrix.format }})
-    runs-on: ubuntu-22.04  # Фиксируем стабильную версию Ubuntu, избегая проблем с Node.js/Ubuntu 26
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5  # <--- Обновлено с v4 на v5 для совместимости с новым окружением
 
       - name: Install build dependencies
         run: |
@@ -35,7 +35,6 @@ jobs:
         run: |
           mkdir -p build_ipk/CONTROL build_ipk/root
           
-          # Метаданные для IPK
           cat << 'EOF' > build_ipk/CONTROL/control
           Package: dns-watcher
           Title: Modular DNS tunnel watcher
@@ -47,12 +46,10 @@ jobs:
           Description: Event-driven DNS monitoring service for OpenWrt tunnels using procd and external hooks.
           EOF
 
-          # Копируем файлы
           cp -r files/* build_ipk/root/
           chmod +x build_ipk/root/etc/init.d/dns-watcher
           chmod +x build_ipk/root/usr/bin/dns-watcher
 
-          # Собираем ipk
           opkg-build -o root -g root build_ipk/ ./output/
 
       - name: Build APK Package
@@ -60,7 +57,6 @@ jobs:
         run: |
           mkdir -p build_apk
           
-          # Метаданные для APK (.PKGINFO)
           cat << 'EOF' > build_apk/.PKGINFO
           pkgname = dns-watcher
           pkgver = 1.0-${{ github.run_number }}
@@ -73,12 +69,10 @@ jobs:
           depend = jsonfilter
           EOF
 
-          # Копируем структуру файлов рядом с .PKGINFO
           cp -r files/* build_apk/
           chmod +x build_apk/etc/init.d/dns-watcher
           chmod +x build_apk/usr/bin/dns-watcher
 
-          # Собираем apk в корень output/
           mkdir -p output
           cd build_apk
           tar --numeric-owner --owner=0 --group=0 -czf ../output/dns-watcher-1.0-${{ github.run_number }}_all.apk .PKGINFO etc/ usr/
