@@ -26,7 +26,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl tar gzip
+          sudo apt-get install -y git tar gzip
 
       - name: Build IPK Package
         if: matrix.format == 'ipk'
@@ -63,14 +63,13 @@ jobs:
             fi
           done
 
-          # Исправленная ссылка на рабочий скрипт opkg-build
-          curl -sSL https://raw.githubusercontent.com/openwrt/opkg-utils/master/opkg-build -o opkg-build
-          chmod +x opkg-build
+          # Клонируем официальный репозиторий вместо скачивания по прямой ссылке
+          git clone https://git.openwrt.org/project/opkg-utils.git _opkg-utils
           
           echo "=== Control file content ==="
           cat build_ipk/CONTROL/control
           
-          ./opkg-build -o root -g root build_ipk/ ./output/
+          ./_opkg-utils/opkg-build -o root -g root build_ipk/ ./output/
 
       - name: Build APK Package
         if: matrix.format == 'apk'
