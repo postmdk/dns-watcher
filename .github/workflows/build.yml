@@ -16,12 +16,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Современный APK-таргет (snapshot / актуальные ветки)
           - format: apk
             arch: aarch64_cortex-a53
             ver: snapshot
-            
-          # Классический IPK-таргет (стабильный релиз 23.05)
           - format: ipk
             arch: mipsel_24kc
             ver: 23.05.5
@@ -36,16 +33,5 @@ jobs:
           ARCH: ${{ matrix.arch }}
           VER: ${{ matrix.ver }}
           PACKAGES: dns-watcher
-
-      - name: Collect compiled packages
-        run: |
-          mkdir -p output
-          # Ищем и копируем собранные пакеты независимо от подпапок SDK
-          find bin/ -name "dns-watcher_*.*" -exec cp {} output/ \;
-          ls -la output/
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dns-watcher-${{ matrix.format }}-${{ matrix.arch }}
-          path: output/*
+          # Отключаем скачивание исходников для локального пакета
+          # SDK будет собирать файлы напрямую из рабочей директории
