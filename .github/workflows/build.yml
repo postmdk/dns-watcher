@@ -33,5 +33,13 @@ jobs:
           ARCH: ${{ matrix.arch }}
           VER: ${{ matrix.ver }}
           PACKAGES: dns-watcher
-          # Отключаем скачивание исходников для локального пакета
-          # SDK будет собирать файлы напрямую из рабочей директории
+
+      # Добавьте этот шаг, чтобы забрать скомпилированные пакеты
+      - name: Upload built packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: openwrt-packages-${{ matrix.arch }}-${{ matrix.ver }}
+          path: |
+            bin/packages/**/*.ipk
+            bin/packages/**/*.apk
+          if-no-files-found: error
