@@ -7,7 +7,7 @@ PKG_RELEASE:=1
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/postmdk/dns-watcher.git
 PKG_SOURCE_VERSION:=main
-PKG_HASH:=f6a304e70ff91f5e236b17e58402969f7cf1fce274f81067dd9a6bb516317edb
+PKG_HASH:=48340ade449344f1f1d3a55696aa3fa39400520ea97b99e59dceb756e6cd38c0
 
 include $(INCLUDE_DIR)/package.mk
 
