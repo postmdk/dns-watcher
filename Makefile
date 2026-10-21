@@ -3,7 +3,10 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=dns-watcher
 PKG_VERSION:=1.0
 PKG_RELEASE:=1
-
+PKG_SOURCE_PROTO:=git
+PKG_SOURCE_URL:=https://github.com/postmdk/dns-watcher.git
+PKG_SOURCE_VERSION:=main
+PKG_MIRROR_HASH:=skip
 include $(INCLUDE_DIR)/package.mk
 
 define Package/dns-watcher
