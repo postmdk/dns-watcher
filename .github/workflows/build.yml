@@ -10,106 +10,38 @@ on:
 
 jobs:
   build:
-    name: Build (${{ matrix.format }})
+    name: Build for SDK ${{ matrix.sdk }}
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
         include:
-          - format: ipk
-          - format: apk
+          # Сборка под IPK (например, релиз OpenWrt 23.05)
+          - sdk: x86_64-23.05
+            format: ipk
+          # Сборка под APK (например, транк / версия 24.10+)
+          - sdk: x86_64
+            format: apk
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Compile OpenWrt Package using Official SDK Action
+        uses: openwrt/gh-action-sdk@main
+        env:
+          ARCH: ${{ matrix.sdk }}
+          PACKAGES: dns-watcher
+
+      - name: Collect and organize artifacts
         run: |
-          sudo apt-get update
-          sudo apt-get install -y git tar gzip
-
-      - name: Build IPK Package
-        if: matrix.format == 'ipk'
-        run: |
-          mkdir -p build_ipk/CONTROL output
-          
-          cat << 'EOF' > build_ipk/CONTROL/control
-          Package: dns-watcher
-          Version: 1.0-${{ github.run_number }}
-          Section: net
-          Architecture: all
-          Maintainer: Dmitry Morozov
-          Depends: libc, ubus, jsonfilter
-          Description: Event-driven DNS monitoring service for OpenWrt tunnels using procd and external hooks.
-          
-          EOF
-
-          sed -i 's/\r$//' build_ipk/CONTROL/control
-
-          if [ -d "files" ]; then
-            cp -r files/* build_ipk/
-          elif [ -d "etc" ] || [ -d "usr" ]; then
-            [ -d "etc" ] && cp -r etc build_ipk/
-            [ -d "usr" ] && cp -r usr build_ipk/
-          else
-            echo "Error: Source files not found!"
-            exit 1
-          fi
-
-          for f in build_ipk/etc/init.d/dns-watcher build_ipk/usr/bin/dns-watcher build_ipk/etc/dns-watcher/*.sh; do
-            if [ -f "$f" ]; then
-              chmod +x "$f"
-              sed -i 's/\r$//' "$f"
-            fi
-          done
-
-          # Клонируем официальный репозиторий вместо скачивания по прямой ссылке
-          git clone https://git.openwrt.org/project/opkg-utils.git _opkg-utils
-          
-          echo "=== Control file content ==="
-          cat build_ipk/CONTROL/control
-          
-          ./_opkg-utils/opkg-build -o root -g root build_ipk/ ./output/
-
-      - name: Build APK Package
-        if: matrix.format == 'apk'
-        run: |
-          mkdir -p build_apk output
-          
-          cat << 'EOF' > build_apk/.PKGINFO
-          pkgname = dns-watcher
-          pkgver = 1.0-${{ github.run_number }}
-          pkgdesc = Modular DNS tunnel watcher for OpenWrt
-          url = https://github.com/
-          arch = noarch
-          maintainer = Dmitry Morozov
-          license = MIT
-          depend = ubus
-          depend = jsonfilter
-          EOF
-
-          sed -i 's/\r$//' build_apk/.PKGINFO
-
-          if [ -d "files" ]; then
-            cp -r files/* build_apk/
-          elif [ -d "etc" ] || [ -d "usr" ]; then
-            [ -d "etc" ] && cp -r etc build_apk/
-            [ -d "usr" ] && cp -r usr build_apk/
-          fi
-
-          for f in build_apk/etc/init.d/dns-watcher build_apk/usr/bin/dns-watcher build_apk/etc/dns-watcher/*.sh; do
-            if [ -f "$f" ]; then
-              chmod +x "$f"
-              sed -i 's/\r$//' "$f"
-            fi
-          done
-
-          cd build_apk
-          tar --numeric-owner --owner=0 --group=0 -czf ../output/dns-watcher-1.0-${{ github.run_number }}_all.apk .PKGINFO etc/ usr/
-          cd ..
+          mkdir -p output
+          # Экшен складывает скомпилированные пакеты внутрь bin/packages/
+          find bin/ -name "*.ipk" -o -name "*.apk" -exec cp {} output/ \;
+          ls -la output/
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dns-watcher-${{ matrix.format }}-package
-          path: output/*.*
+          name: openwrt-package-${{ matrix.sdk }}-${{ matrix.format }}
+          path: output/*
