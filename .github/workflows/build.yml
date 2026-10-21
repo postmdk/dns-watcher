@@ -16,12 +16,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Современный формат APK под aarch64 (например, MediaTek Filogic / RAX3000M)
           - format: apk
             arch: aarch64_cortex-a53
             ver: snapshot
-            
-          # Классический формат IPK под mipsel (например, старые роутеры / Keenetic)
           - format: ipk
             arch: mipsel_24kc
             ver: 23.05.5
@@ -29,18 +26,21 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          path: dns-watcher-source
 
       - name: Build with OpenWrt SDK
         uses: openwrt/gh-action-sdk@main
         env:
           ARCH: ${{ matrix.arch }}
           VER: ${{ matrix.ver }}
+          # Передаем пакет через локальное копирование в дерево SDK
+          EXTRA_PACKAGES: ../dns-watcher-source
           PACKAGES: dns-watcher
 
       - name: Collect artifacts
         run: |
           mkdir -p output
-          # Ищем собранные пакеты в зависимости от формата
           if [ "${{ matrix.format }}" = "apk" ]; then
             find bin/ -name "*.apk" -exec cp {} output/ \;
           else
