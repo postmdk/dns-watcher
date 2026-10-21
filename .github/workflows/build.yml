@@ -36,13 +36,8 @@ jobs:
 
       - name: Prepare packages for upload
         run: |
-          # Создаем уникальную подпапку для текущей архитектуры, чтобы задачи матрицы не конфликтовали
           mkdir -p compiled-packages/${{ matrix.arch }}
-          
-          # Рекурсивно ищем и копируем строго наш пакет dns-watcher (.ipk и .apk), исключая любые другие файлы
           find bin/packages/ -type f \( -name "dns-watcher_*.ipk" -o -name "dns-watcher_*.apk" \) -exec cp {} compiled-packages/${{ matrix.arch }}/ \;
-          
-          # Выводим список для проверки
           ls -la compiled-packages/${{ matrix.arch }}/
 
       - name: Upload artifacts (for workflow run)
