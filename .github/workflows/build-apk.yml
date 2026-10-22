@@ -1,0 +1,64 @@
+name: Build dns-watcher (APK)
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      # Используем официальный SDK-контейнер для OpenWrt 25.x (замените target/subtarget/version под себя)
+      image: ghcr.io/openwrt/sdk:x86-64-generic-25.12.0
+      options: --user root
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build APK package
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_DIR="${OPENWRT_SDK_DIR:-/builder}"
+          cd "$SDK_DIR"
+
+          if [ ! -d scripts ]; then
+            ./setup.sh
+          fi
+
+          # Создаем локальный фид для dns-watcher
+          WORKSPACE_DIR="$GITHUB_WORKSPACE"
+          FEED_DIR="$SDK_DIR/package/dns-watcher"
+          rm -rf "$FEED_DIR"
+          cp -a "$WORKSPACE_DIR" "$FEED_DIR"
+
+          # Настраиваем конфигурацию
+          echo "CONFIG_PACKAGE_dns-watcher=m" > .config
+          make defconfig
+
+          # Компилируем пакет (на выходе будет .apk)
+          make package/dns-watcher/compile V=s
+
+          # Собираем готовый .apk в отдельную папку
+          mkdir -p "$GITHUB_WORKSPACE/compiled-packages"
+          find bin/packages/ -type f -name "dns-watcher_*.apk" -exec cp {} "$GITHUB_WORKSPACE/compiled-packages/" \;
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dns-watcher-apk
+          path: compiled-packages/*
+
+      - name: Publish Release (on Tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: compiled-packages/*
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
