@@ -1,0 +1,26 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+STOP=10
+
+USE_PROCD=1
+
+start_service() {
+    
+    config_load 'dns-watcher'
+    local enabled
+    config_get_bool enabled 'settings' 'enabled' 0
+    
+    [ "$enabled" -eq 0 ] && return 0
+
+    procd_open_instance "dns-watcher"
+    procd_set_param command /usr/bin/dns-watcher
+    
+    procd_set_param respawn
+    procd_close_instance
+}
+
+restart_service() {
+    stop
+    start
+}
