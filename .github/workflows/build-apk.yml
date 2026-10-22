@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       # Используем официальный SDK-контейнер для OpenWrt 25.x (замените target/subtarget/version под себя)
-      image: ghcr.io/openwrt/sdk:x86-64-generic-25.12.0
+      image: ghcr.io/openwrt/sdk:x86-64-25.12.0
       options: --user root
     steps:
       - name: Checkout repository
