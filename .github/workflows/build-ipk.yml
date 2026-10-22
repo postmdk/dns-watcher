@@ -36,7 +36,8 @@ jobs:
     runs-on: ubuntu-latest
     container:
       # Официальный SDK-контейнер OpenWrt позволяет не качать SDK вручную
-      image: ghcr.io/openwrt/sdk:ramips-rt305x-24.10.0 # Можно менять под нужную связку
+      image: ghcr.io/openwrt/sdk:x86-64-23.05.6
+      #image: ghcr.io/openwrt/sdk:ramips-rt305x-24.10.0 # Можно менять под нужную связку
       options: --user root
     steps:
       - name: Checkout repository
