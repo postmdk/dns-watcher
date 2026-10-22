@@ -37,8 +37,8 @@ define Package/dns-watcher/install
 	$(INSTALL_CONF) ./files/etc/config/dns-watcher $(1)/etc/config/dns-watcher
 	$(INSTALL_BIN) ./files/etc/init.d/dns-watcher $(1)/etc/init.d/dns-watcher
 	$(INSTALL_BIN) ./files/usr/bin/dns-watcher $(1)/usr/bin/dns-watcher
-	$(INSTALL_DATA) ./files/etc/dns-watcher/up.sh $(1)/etc/dns-watcher/
-	$(INSTALL_DATA) ./files/etc/dns-watcher/down.sh $(1)/etc/dns-watcher/
+	$(INSTALL_BIN) ./files/etc/dns-watcher/up.sh $(1)/etc/dns-watcher/
+	$(INSTALL_BIN) ./files/etc/dns-watcher/down.sh $(1)/etc/dns-watcher/
 endef
 
 $(eval $(call BuildPackage,dns-watcher))
