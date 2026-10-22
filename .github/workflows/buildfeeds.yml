@@ -1,0 +1,85 @@
+name: Build dns-watcher
+
+on:
+  push:
+    branches: [ "main", "24.10", "23.05" ]
+    tags: [ "v*" ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "OpenWRT version (e.g., 23.05.6, 24.10.0, 25.12.6)"
+        required: true
+        default: "24.10.0"
+        type: string
+      arch:
+        description: "Architecture (e.g., mipsel_24kc, aarch64_cortex-a53)"
+        required: true
+        default: "mipsel_24kc"
+        type: string
+      target:
+        description: "Target (e.g., ramips, mediatek)"
+        required: true
+        default: "ramips"
+        type: string
+      subtarget:
+        description: "Subtarget (e.g., rt305x, filogic)"
+        required: true
+        default: "rt305x"
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ inputs.version || 'auto' }} / ${{ inputs.arch || 'default' }})
+    runs-on: ubuntu-latest
+    container:
+      # Официальный SDK-контейнер OpenWrt позволяет не качать SDK вручную
+      image: ghcr.io/openwrt/sdk:ramips-rt305x-24.10.0 # Можно менять под нужную связку
+      options: --user root
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build package
+        run: |
+          set -euo pipefail
+          SDK_DIR="${OPENWRT_SDK_DIR:-/builder}"
+          cd "$SDK_DIR"
+
+          if [ ! -d scripts ]; then
+            ./setup.sh
+          fi
+
+          # Создаем локальный фид для dns-watcher
+          WORKSPACE_DIR="$GITHUB_WORKSPACE"
+          FEED_DIR="$SDK_DIR/package/dns-watcher"
+          rm -rf "$FEED_DIR"
+          cp -a "$WORKSPACE_DIR" "$FEED_DIR"
+
+          # Настраиваем .config
+          echo "CONFIG_PACKAGE_dns-watcher=m" > .config
+          make defconfig
+
+          # Собираем пакет
+          make package/dns-watcher/compile V=s
+
+          # Собираем все скомпилированные пакетики в одну плоскую папку для артефактов
+          mkdir -p "$GITHUB_WORKSPACE/compiled-packages"
+          find bin/packages/ -type f \( -name "dns-watcher_*.ipk" -o -name "dns-watcher_*.apk" \) -exec cp {} "$GITHUB_WORKSPACE/compiled-packages/" \;
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dns-watcher-packages
+          path: compiled-packages/*
+
+      - name: Publish Release (on Tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: compiled-packages/*
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
