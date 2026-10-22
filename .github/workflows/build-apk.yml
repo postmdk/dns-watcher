@@ -41,12 +41,15 @@ jobs:
           echo "CONFIG_PACKAGE_dns-watcher=m" > .config
           make defconfig
 
-          # Компилируем пакет (на выходе будет .apk)
+          # Компилируем пакет
           make package/dns-watcher/compile V=s
 
-          # Собираем готовый .apk в отдельную папку
+          # Создаем целевую папку и копируем скомпилированный .apk из структуры SDK
           mkdir -p "$GITHUB_WORKSPACE/compiled-packages"
-          find bin/packages/ -type f -name "dns-watcher_*.apk" -exec cp {} "$GITHUB_WORKSPACE/compiled-packages/" \;
+          find bin/packages/ -type f -name "dns-watcher_*.apk" -exec cp -v {} "$GITHUB_WORKSPACE/compiled-packages/" \;
+          
+          # Проверка: выводим содержимое папки, чтобы убедиться, что файл на месте
+          ls -la "$GITHUB_WORKSPACE/compiled-packages/"
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
