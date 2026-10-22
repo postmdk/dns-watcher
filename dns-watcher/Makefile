@@ -34,19 +34,19 @@ define Package/dns-watcher/install
 	$(INSTALL_DIR) $(1)/etc/dns-watcher
 	$(INSTALL_DIR) $(1)/usr/bin
 
-	$(if $(wildcard $(PKG_BUILD_DIR)/dns-watcher/files/etc/config/dns-watcher), \
-		$(INSTALL_CONF) $(PKG_BUILD_DIR)/dns-watcher/files/etc/config/dns-watcher $(1)/etc/config/dns-watcher)
+	$(if $(wildcard $(PKG_BUILD_DIR)/files/etc/config/dns-watcher), \
+		$(INSTALL_CONF) $(PKG_BUILD_DIR)/files/etc/config/dns-watcher $(1)/etc/config/dns-watcher)
 
-	$(if $(wildcard $(PKG_BUILD_DIR)/dns-watcher/files/etc/init.d/dns-watcher), \
-		$(INSTALL_BIN) $(PKG_BUILD_DIR)/dns-watcher/files/etc/init.d/dns-watcher $(1)/etc/init.d/dns-watcher)
+	$(if $(wildcard $(PKG_BUILD_DIR)/files/etc/init.d/dns-watcher), \
+		$(INSTALL_BIN) $(PKG_BUILD_DIR)/files/etc/init.d/dns-watcher $(1)/etc/init.d/dns-watcher)
 
-	$(if $(wildcard $(PKG_BUILD_DIR)/dns-watcher/files/usr/bin/dns-watcher), \
-		$(INSTALL_BIN) $(PKG_BUILD_DIR)/dns-watcher/files/usr/bin/dns-watcher $(1)/usr/bin/dns-watcher)
+	$(if $(wildcard $(PKG_BUILD_DIR)/files/usr/bin/dns-watcher), \
+		$(INSTALL_BIN) $(PKG_BUILD_DIR)/files/usr/bin/dns-watcher $(1)/usr/bin/dns-watcher)
 
-	$(if $(wildcard $(PKG_BUILD_DIR)/dns-watcher/files/etc/dns-watcher/up.sh), \
-		$(INSTALL_DATA) $(PKG_BUILD_DIR)/dns-watcher/files/etc/dns-watcher/up.sh $(1)/etc/dns-watcher/)
-	$(if $(wildcard $(PKG_BUILD_DIR)/dns-watcher/files/etc/dns-watcher/down.sh), \
-		$(INSTALL_DATA) $(PKG_BUILD_DIR)/dns-watcher/files/etc/dns-watcher/down.sh $(1)/etc/dns-watcher/)
+	$(if $(wildcard $(PKG_BUILD_DIR)/files/etc/dns-watcher/up.sh), \
+		$(INSTALL_DATA) $(PKG_BUILD_DIR)/files/etc/dns-watcher/up.sh $(1)/etc/dns-watcher/)
+	$(if $(wildcard $(PKG_BUILD_DIR)/files/etc/dns-watcher/down.sh), \
+		$(INSTALL_DATA) $(PKG_BUILD_DIR)/files/etc/dns-watcher/down.sh $(1)/etc/dns-watcher/)
 endef
 
 $(eval $(call BuildPackage,dns-watcher))
