@@ -4,18 +4,33 @@ START=99
 STOP=10
 
 USE_PROCD=1
+boot() {
+    # Checking the current resolvfile configuration in UCI
+    local current_resolv
+    current_resolv=$(uci get dhcp.@dnsmasq[0].resolvfile 2>/dev/null)
+
+    # If a fallback is specified there, we return auto
+    case "$current_resolv" in
+        *fallback*)
+            uci set dhcp.@dnsmasq[0].resolvfile='/tmp/resolv.conf.d/resolv.conf.auto'
+            uci commit dhcp
+            ;;
+    esac
+
+    # start daemon
+    start
+}
 
 start_service() {
-    
+
     config_load 'dns-watcher'
     local enabled
     config_get_bool enabled 'settings' 'enabled' 0
-    
+
     [ "$enabled" -eq 0 ] && return 0
 
     procd_open_instance "dns-watcher"
     procd_set_param command /usr/bin/dns-watcher
-    
     procd_set_param respawn
     procd_close_instance
 }
